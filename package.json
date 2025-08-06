@@ -1,0 +1,25 @@
+{
+  "name": "azureprojekt",
+  "version": "1.0.0",
+  "description": "ich versuch es mit KI so zu lösen das cursor eine bicep und .json Datei erstellt.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/R0tBart/azureProjekt.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/R0tBart/azureProjekt/issues"
+  },
+  "homepage": "https://github.com/R0tBart/azureProjekt#readme",
+  "dependencies": {
+    "express": "^5.1.0",
+    "pg": "^8.16.3"
+  }
+}

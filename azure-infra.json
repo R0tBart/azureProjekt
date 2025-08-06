@@ -1,0 +1,225 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.37.4.10188",
+      "templateHash": "5568194429311712549"
+    }
+  },
+  "parameters": {
+    "rgName": {
+      "type": "string",
+      "defaultValue": "rg-on-24-09-christoph"
+    },
+    "postgresAdminPassword": {
+      "type": "string"
+    },
+    "appServiceSecret": {
+      "type": "securestring",
+      "defaultValue": "myAppSecretValue"
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Storage/storageAccounts",
+      "apiVersion": "2022-09-01",
+      "name": "[format('mystartupst{0}', uniqueString(parameters('rgName')))]",
+      "location": "westeurope",
+      "sku": {
+        "name": "Standard_LRS"
+      },
+      "kind": "StorageV2",
+      "properties": {
+        "accessTier": "Hot",
+        "allowBlobPublicAccess": false
+      }
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2022-09-01",
+      "name": "[format('{0}/default/uploads', format('mystartupst{0}', uniqueString(parameters('rgName'))))]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', format('mystartupst{0}', uniqueString(parameters('rgName'))))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+      "apiVersion": "2022-09-01",
+      "name": "[format('{0}/default/assets', format('mystartupst{0}', uniqueString(parameters('rgName'))))]",
+      "properties": {
+        "publicAccess": "None"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts', format('mystartupst{0}', uniqueString(parameters('rgName'))))]"
+      ]
+    },
+    {
+      "type": "Microsoft.ContainerRegistry/registries",
+      "apiVersion": "2023-01-01-preview",
+      "name": "[format('myacr{0}', uniqueString(parameters('rgName')))]",
+      "location": "westeurope",
+      "sku": {
+        "name": "Basic"
+      },
+      "properties": {
+        "adminUserEnabled": true
+      }
+    },
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2023-04-01",
+      "name": "myStartupVNet",
+      "location": "westeurope",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "dbSubnet",
+            "properties": {
+              "addressPrefix": "10.0.0.0/24",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', 'dbSubnet-nsg')]"
+              },
+              "delegations": [
+                {
+                  "name": "postgresDelegation",
+                  "properties": {
+                    "serviceName": "Microsoft.DBforPostgreSQL/flexibleServers"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "webappSubnet",
+            "properties": {
+              "addressPrefix": "10.0.1.0/24",
+              "delegations": [
+                {
+                  "name": "webappDelegation",
+                  "properties": {
+                    "serviceName": "Microsoft.Web/serverFarms"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', 'dbSubnet-nsg')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2023-04-01",
+      "name": "dbSubnet-nsg",
+      "location": "westeurope",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "Allow-Postgres-From-WebSubnet",
+            "properties": {
+              "priority": 100,
+              "direction": "Inbound",
+              "access": "Allow",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "sourceAddressPrefix": "10.0.1.0/24",
+              "destinationPortRanges": [
+                "5432"
+              ],
+              "destinationAddressPrefix": "10.0.0.0/24"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2020-06-01",
+      "name": "mystartup-postgres.private.postgres.database.azure.com",
+      "location": "global"
+    },
+    {
+      "type": "Microsoft.DBforPostgreSQL/flexibleServers",
+      "apiVersion": "2022-12-01",
+      "name": "[format('mypgserver{0}', uniqueString(parameters('rgName')))]",
+      "location": "westeurope",
+      "properties": {
+        "administratorLogin": "pgadmin",
+        "administratorLoginPassword": "[parameters('postgresAdminPassword')]",
+        "version": "13",
+        "storage": {
+          "storageSizeGB": 32
+        },
+        "network": {
+          "delegatedSubnetResourceId": "[reference(resourceId('Microsoft.Network/virtualNetworks', 'myStartupVNet'), '2023-04-01').subnets[0].id]",
+          "privateDnsZoneArmResourceId": "[resourceId('Microsoft.Network/privateDnsZones', 'mystartup-postgres.private.postgres.database.azure.com')]"
+        }
+      },
+      "sku": {
+        "name": "Standard_D2ds_v5",
+        "tier": "GeneralPurpose",
+        "family": "Gen5",
+        "capacity": 2
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', 'mystartup-postgres.private.postgres.database.azure.com')]",
+        "[resourceId('Microsoft.Network/virtualNetworks', 'myStartupVNet')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2022-03-01",
+      "name": "myStartupAppServicePlan",
+      "location": "westeurope",
+      "sku": {
+        "name": "P1v2",
+        "tier": "PremiumV2"
+      }
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2022-03-01",
+      "name": "[format('myStartupAppService{0}', uniqueString(parameters('rgName')))]",
+      "location": "westeurope",
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', 'myStartupAppServicePlan')]",
+        "siteConfig": {
+          "vnetRouteAllEnabled": true,
+          "vnetName": "myStartupVNet",
+          "appSettings": [
+            {
+              "name": "MY_APP_SECRET",
+              "value": "[parameters('appServiceSecret')]"
+            }
+          ]
+        },
+        "virtualNetworkSubnetId": "[reference(resourceId('Microsoft.Network/virtualNetworks', 'myStartupVNet'), '2023-04-01').subnets[1].id]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/serverfarms', 'myStartupAppServicePlan')]",
+        "[resourceId('Microsoft.Network/virtualNetworks', 'myStartupVNet')]"
+      ]
+    },
+    {
+      "type": "Microsoft.Cdn/profiles",
+      "apiVersion": "2023-05-01",
+      "name": "myFrontDoorProfile",
+      "location": "Global",
+      "sku": {
+        "name": "Standard_AzureFrontDoor"
+      }
+    }
+  ]
+}

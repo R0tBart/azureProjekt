@@ -1,7 +1,8 @@
 param rgName string = 'rg-on-24-09-christoph'
+@secure()
 param postgresAdminPassword string
 @secure()
-param appServiceSecret string = 'myAppSecretValue'
+param appServiceSecret string
 
 // Azure Storage Account mit Blob-Service
 resource storageAccount 'Microsoft.Storage/storageAccounts@2022-09-01' = {
@@ -127,7 +128,7 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   properties: {
     administratorLogin: 'pgadmin'
     administratorLoginPassword: postgresAdminPassword
-    version: '13'
+    version: '17'
     storage: {
       storageSizeGB: 32
     }
@@ -139,8 +140,6 @@ resource postgres 'Microsoft.DBforPostgreSQL/flexibleServers@2022-12-01' = {
   sku: {
     name: 'Standard_D2ds_v5'
     tier: 'GeneralPurpose'
-    family: 'Gen5'
-    capacity: 2
   }
 }
 

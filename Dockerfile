@@ -11,4 +11,4 @@ COPY . .
 # Expose the port (optional, for documentation)
 EXPOSE 3000
 # Start the application
-CMD ["node", "app.js"]
+CMD ["node", "index.js"]
